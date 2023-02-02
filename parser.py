@@ -1,9 +1,7 @@
+import json
+
 import requests
 from bs4 import BeautifulSoup
-from lxml.html import soupparser, tostring, parse, fromstring
-from lxml import etree
-import json
-import re
 
 import config
 
@@ -13,8 +11,8 @@ headers = {
 }
 BASE_URL = "https://finance.yahoo.com/quote/"
 
-def get_prices(tickers_array):
 
+def get_prices(tickers_array):
     result = dict()
     for ticker in tickers_array:
         response = requests.get(url=BASE_URL + ticker, headers=headers)
@@ -33,41 +31,48 @@ def get_stats(ticker):
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, "lxml")
         stats = dict()
-        price = soup.find('fin-streamer', attrs={"data-test": "qsp-price", "data-field": "regularMarketPrice", "data-symbol": ticker}).get_text()
+        price = soup.find('fin-streamer', attrs={"data-test": "qsp-price", "data-field": "regularMarketPrice",
+                                                 "data-symbol": ticker}).get_text()
         stats['price'] = price
 
-        stats_section = soup.find("section", attrs={"data-test":"qsp-statistics"})
+        # Get all sections
+        stats_section = soup.find("section", attrs={"data-test": "qsp-statistics"})
+        stats_div = stats_section.find("div", attrs={"class": "Mstart(a) Mend(a)"})
+        all_sections = []
+        for section in stats_div.find_all("div", attrs={"class": "Fl(end)"}):
+            all_sections.append(section)
+        for section in stats_div.find_all("div", attrs={"class": "Fl(start)"}):
+            all_sections.append(section)
 
-        section_headers_soup = stats_section.find_all('h2')
-        table_headers_soup = stats_section.find_all('h3')
-        section_headers_arr = []
-        table_headers_arr = []
+        stats["sections"] = []
 
-        for header in section_headers_soup:
-            section_headers_arr.append(header.get_text())
+        for section in all_sections:
+            section_dict = dict()
+            section_header = section.find("h2")
+            if section_header is not None:
+                section_dict['section_header'] = section_header.get_text()
+            else:
+                section_dict['section_header'] = None
+            table_sections = section.find_all("div", attrs={"class": "Pos(r) Mt(10px)"})
 
-        for header in table_headers_soup:
-            table_headers_arr.append(header.get_text())
+            section_dict['tables'] = []
 
-        stats["section_headers"] = section_headers_arr
-        stats["table_headers"] = table_headers_arr
-
-        tables_soup = stats_section.find_all("table")
-        tables_arr = []
-
-        for table in tables_soup:
-            table_dictionary = dict()
-            rows = table.find_all("tr")
-
-            for row in rows:
-                columns = row.find_all("td")
-                table_dictionary[columns[0].get_text()] = columns[1].get_text()
-
-            tables_arr.append(table_dictionary)
-
-        stats['tables'] = tables_arr
-
-
+            for table_section in table_sections:
+                table_dict = dict()
+                table_header = table_section.find("h3")
+                if table_header is not None:
+                    table_dict['table_header'] = table_header.get_text()
+                else:
+                    table_dict['table_header'] = None
+                table = table_section.find("table")
+                table_dict['table'] = dict()
+                rows = table.find_all("tr")
+                for row in rows:
+                    columns = row.find_all("td")
+                    if len(columns) == 2:
+                        table_dict['table'][columns[0].get_text()] = columns[-1].get_text()
+                section_dict['tables'].append(table_dict)
+            stats['sections'].append(section_dict)
     else:
         stats = "Не смог найти информацию о компании"
     return stats
@@ -78,8 +83,7 @@ def main():
     # for k, v in get_single_company_news("META").items():
     #     print(f'{k}: {v}')
 
-
-
+    # get_stats('META')
     data = get_stats("META")
     with open("stats.json", "w") as jsonfile:
         json.dump(data, jsonfile)
