@@ -52,7 +52,7 @@ def get_stats(ticker):
             if section_header is not None:
                 section_dict['section_header'] = section_header.get_text()
             else:
-                section_dict['section_header'] = None
+                section_dict['section_header'] = ''
             table_sections = section.find_all("div", attrs={"class": "Pos(r) Mt(10px)"})
 
             section_dict['tables'] = []
@@ -63,7 +63,7 @@ def get_stats(ticker):
                 if table_header is not None:
                     table_dict['table_header'] = table_header.get_text()
                 else:
-                    table_dict['table_header'] = None
+                    table_dict['table_header'] = ''
                 table = table_section.find("table")
                 table_dict['table'] = dict()
                 rows = table.find_all("tr")
@@ -75,16 +75,15 @@ def get_stats(ticker):
             stats['sections'].append(section_dict)
     else:
         stats = "Не смог найти информацию о компании"
+    with open("stats.json", "w") as jsonfile:
+        json.dump(stats, jsonfile)
     return stats
 
 
 def main():
     tickers_array = ["META", "CVNA", "AMZN", "GOOG", "PTON"]
-    # for k, v in get_single_company_news("META").items():
-    #     print(f'{k}: {v}')
-
-    # get_stats('META')
     data = get_stats("META")
+
     with open("stats.json", "w") as jsonfile:
         json.dump(data, jsonfile)
 
