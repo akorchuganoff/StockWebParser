@@ -1,3 +1,5 @@
+import json
+
 from fpdf import FPDF
 
 
@@ -9,7 +11,7 @@ def create_table(pdf, data, title='', data_size=10, title_size=12, align_data='L
     pdf.set_font(size=title_size)
     # add title
     if title != '':
-        pdf.multi_cell(0, line_height, title, border=0, align='j', ln=3, max_line_height=pdf.font_size)
+        pdf.multi_cell(120, line_height, title, border=0, align='j', ln=3, max_line_height=pdf.font_size)
         pdf.ln(line_height)  # move cursor back to the left margin
 
     pdf.set_font(size=data_size)
@@ -33,20 +35,19 @@ def create_table(pdf, data, title='', data_size=10, title_size=12, align_data='L
     pdf.ln(line_height)
 
 
-def make_pdf_from_json(response_json):
+def make_pdf_from_json(response_json, result_filename):
     pdf_object = FPDF()
     pdf_object.add_page()
-    pdf_object.set_font("Times", size=10)
+    pdf_object.set_font("Times", size=32)
+    pdf_object.multi_cell(120, pdf_object.font_size * 2.5, f"Current Price: {response_json['price']}", border=0, align='j', ln=3,
+                          max_line_height=pdf_object.font_size)
+    pdf_object.ln(pdf_object.font_size * 2.5)
 
-    # JSONfile formal like data.json
-
-    # with open('stats.json', 'r') as jsonfile:
-    #     response_json = json.load(jsonfile)
     for section in response_json['sections']:
 
         section_header = section['section_header']
         pdf_object.set_font("Times", size=24)
-        pdf_object.multi_cell(0, pdf_object.font_size * 2.5, section_header, border=0, align='j', ln=3,
+        pdf_object.multi_cell(120, pdf_object.font_size * 2.5, section_header, border=0, align='j', ln=3,
                               max_line_height=pdf_object.font_size)
         pdf_object.ln(pdf_object.font_size * 2.5)
 
@@ -58,7 +59,7 @@ def make_pdf_from_json(response_json):
             pdf_object.ln(3)
         pdf_object.add_page()
 
-    pdf_object.output('table_function.pdf')
+    pdf_object.output(result_filename)
 
 
 def get_reformated_data(data):
@@ -69,7 +70,9 @@ def get_reformated_data(data):
 
 
 def main():
-    make_pdf_from_json()
+    with open('stats.json', 'r') as jsonfile:
+        response = json.load((jsonfile))
+    make_pdf_from_json(response, 'file.pdf')
 
 
 if __name__ == '__main__':

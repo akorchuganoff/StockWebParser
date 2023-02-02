@@ -75,12 +75,15 @@ def get_stats(ticker):
             stats['sections'].append(section_dict)
     else:
         stats = "Не смог найти информацию о компании"
+    with open("stats.json", "w") as jsonfile:
+        json.dump(stats, jsonfile)
     return stats
 
 
 def main():
     tickers_array = ["META", "CVNA", "AMZN", "GOOG", "PTON"]
     data = get_stats("META")
+
     with open("stats.json", "w") as jsonfile:
         json.dump(data, jsonfile)
 

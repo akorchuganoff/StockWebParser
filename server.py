@@ -1,12 +1,16 @@
 import json
+import time
 
 import telebot
 from flask import Flask
 from flask import request, abort
 import requests
+from datetime import datetime
+import os
 
 import config
 from parser import get_stats
+from response_maker import make_pdf_from_json
 
 # Создание приложения фласк и бота по токену
 app = Flask(__name__)
@@ -14,8 +18,8 @@ bot = telebot.TeleBot(config.token)
 
 
 # Чтобы подвязать вебхуки - сначала удалите их из бота (если уже были) и установите новые
-bot.remove_webhook()
-bot.set_webhook("https://0461-95-64-138-66.eu.ngrok.io/")
+# bot.remove_webhook()
+# bot.set_webhook("https://7a53-95-64-138-66.eu.ngrok.io/")
 
 # Вьюшка, отвечающая за получение вебхуков от телеграма
 @app.route("/", methods=['GET', 'POST'])
@@ -46,9 +50,25 @@ def add(message):
 def stats(message):
     ticker = message.text.split(maxsplit=1)[1]  # В переменной будет всё,что идёт после /stats
     bot.send_message(message.chat.id, f'Ticker = {ticker}')
+    print('start parsing')
     answer = get_stats(ticker)
-    text = f"```{json.dumps(answer)}```"
+    print('end parsing')
+    text = "Сейчас пришлю файл с подробным отчетом о компании"
+
+    filename = f'{ticker}_{message.chat.id}_{datetime.now().strftime("%Y-%m-%d_%H_%M")}.pdf'
+    print('PDF making')
+    make_pdf_from_json(answer, filename)
+    print('PDF Done')
+
     bot.send_message(message.chat.id, text)
+    print("open file")
+    file = open(filename, 'rb')
+    print("send message")
+    bot.send_document(message.chat.id, file)
+    time.sleep(3)
+    print("remove file")
+    os.remove(filename)
+
 
 
 if __name__ == "__main__":
