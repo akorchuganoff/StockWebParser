@@ -4,16 +4,37 @@ import time
 import telebot
 from flask import Flask
 from flask import request, abort
+from flask import Flask, render_template, request, url_for, redirect
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.postgresql import JSON
 import requests
 from datetime import datetime
 import os
 
 import config
-from parser import get_stats
+from parser import get_stats, get_prices
 from response_maker import make_pdf_from_json
 
 # Создание приложения фласк и бота по токену
 app = Flask(__name__)
+app.app_context().push()
+
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'server.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+class User(db.Model):
+    chat_id = db.Column(db.Integer, primary_key=True)
+    firstname = db.Column(db.String(100), nullable=False)
+    lastname = db.Column(db.String(100), nullable=False)
+    portfolio = db.Column(JSON)
+
+    def __repr__(self):
+        return f"User {self.chat_id}"
+
 bot = telebot.TeleBot(config.token)
 
 
@@ -37,39 +58,87 @@ def index():
 def start(message):
     text = """Привет,\nЯ бот помошник на рынке акций. Я умею находить цену акций, а также читать новости о компании.
 Чтобы добавить бумагу в портфель напиши /add <тикер на бирже>
+Чтобы получить цену бумаг в портфеле - напиши /prices (После вызова этого метода - последние цены в системе - обновятся)
 Чтобы получить полную информацию - напиши /stats <ticker>"""
     bot.send_message(message.chat.id, text)
 
 
 @bot.message_handler(commands=['add'])
 def add(message):
-    pass
+    try:
+        with app.app_context():
+            ticker = message.text.split(maxsplit=1)[1]  # В переменной будет всё,что идёт после /stats
+            bot.send_message(message.chat.id, f'Ticker = {ticker}')
+            user = User.query.filter_by(chat_id=message.chat.id).first()
+            if user is None:
+                data = dict()
+                data = get_prices([ticker])
+                user = User(
+                    chat_id=message.chat.id,
+                    portfolio=json.dumps(data),
+                    firstname=message.from_user.first_name,
+                    lastname=message.from_user.last_name
+                )
+            else:
+                data = json.loads(user.portfolio)
+                data[ticker] = get_prices([ticker])[ticker]
+                user.portfolio = json.dumps(data)
+            print(user)
+            db.session.add(user)
+            db.session.commit()
+            bot.send_message(message.chat.id, f'Ticker = {ticker} - added to your portfolio')
+    except Exception as ex:
+        print(ex)
+
+@bot.message_handler(commands=['prices'])
+def prices(message):
+    try:
+        text = "Цены в системе обновлены"
+        text += "Цены акций в формате: 'Тикер - Последняя цена - Текущая цена - Разница'\n"
+        with app.app_context():
+            user = User.query.filter_by(chat_id=message.chat.id).first()
+            if user is None:
+                bot.send_message(message.chat.id, "У вас еще нет портфеля. Создайте его командой /add")
+            bot.send_message(message.chat.id, "Собираем данные, ожидайте")
+            portfolio = json.loads(user.portfolio)
+            keys = portfolio.keys()
+            prices = get_prices(keys)
+
+            for k, v in portfolio.items():
+                text += f"{k} - {v} - {prices[k]} - {float(prices[k])/float(v) * 100 - 100}%\n"
+            bot.send_message(message.chat.id, text)
+            user.portfolio = json.dumps(prices)
+            db.session.add(user)
+            db.session.commit()
+    except Exception as ex:
+        print(ex)
 
 
 @bot.message_handler(commands=['stats'])
 def stats(message):
     ticker = message.text.split(maxsplit=1)[1]  # В переменной будет всё,что идёт после /stats
     bot.send_message(message.chat.id, f'Ticker = {ticker}')
-    print('start parsing')
     answer = get_stats(ticker)
-    print('end parsing')
     text = "Сейчас пришлю файл с подробным отчетом о компании"
 
     filename = f'{ticker}_{message.chat.id}_{datetime.now().strftime("%Y-%m-%d_%H_%M")}.pdf'
-    print('PDF making')
     make_pdf_from_json(answer, filename)
-    print('PDF Done')
 
     bot.send_message(message.chat.id, text)
-    print("open file")
     file = open(filename, 'rb')
-    print("send message")
     bot.send_document(message.chat.id, file)
     time.sleep(3)
-    print("remove file")
     os.remove(filename)
+
+
+def main():
+    ## if we have a mistake, and want to drop all db
+    # with app.app_context():
+    #     db.drop_all()
+    #     db.create_all()
+    app.run(host='0.0.0.0', port=4567, debug=False)
 
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=4567, debug=False)
+    main()

@@ -15,6 +15,7 @@ BASE_URL = "https://finance.yahoo.com/quote/"
 def get_prices(tickers_array):
     result = dict()
     for ticker in tickers_array:
+        print(ticker)
         response = requests.get(url=BASE_URL + ticker, headers=headers)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "lxml")
