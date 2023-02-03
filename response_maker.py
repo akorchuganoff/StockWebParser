@@ -39,7 +39,8 @@ def make_pdf_from_json(response_json, result_filename):
     pdf_object = FPDF()
     pdf_object.add_page()
     pdf_object.set_font("Times", size=32)
-    pdf_object.multi_cell(120, pdf_object.font_size * 2.5, f"Current Price: {response_json['price']}", border=0, align='j', ln=3,
+    pdf_object.multi_cell(120, pdf_object.font_size * 2.5, f"Current Price: {response_json['price']}", border=0,
+                          align='j', ln=3,
                           max_line_height=pdf_object.font_size)
     pdf_object.ln(pdf_object.font_size * 2.5)
 

@@ -1,15 +1,13 @@
 import json
+import os
 import time
+from datetime import datetime
 
 import telebot
-from flask import Flask
-from flask import request, abort
-from flask import Flask, render_template, request, url_for, redirect
+from flask import Flask, request
+from flask import abort
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import JSON
-import requests
-from datetime import datetime
-import os
 
 import config
 from parser import get_stats, get_prices
@@ -26,6 +24,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+
 class User(db.Model):
     chat_id = db.Column(db.Integer, primary_key=True)
     firstname = db.Column(db.String(100), nullable=False)
@@ -34,6 +33,7 @@ class User(db.Model):
 
     def __repr__(self):
         return f"User {self.chat_id}"
+
 
 bot = telebot.TeleBot(config.token)
 
@@ -93,11 +93,12 @@ def add(message):
     except Exception as ex:
         print(ex)
 
+
 @bot.message_handler(commands=['prices'])
 def prices(message):
     try:
-        text = "Цены в системе обновлены"
-        text += "Цены акций в формате: 'Тикер - Последняя цена - Текущая цена - Разница'\n"
+        text = "Цены в системе обновлены\n"
+        text += "Цены акций в формате:\n'Тикер - Последняя цена - Текущая цена - Разница'\n"
         with app.app_context():
             user = User.query.filter_by(chat_id=message.chat.id).first()
             if user is None:
@@ -106,9 +107,10 @@ def prices(message):
             portfolio = json.loads(user.portfolio)
             keys = portfolio.keys()
             prices = get_prices(keys)
+            print(prices)
 
             for k, v in portfolio.items():
-                text += f"{k} - {v} - {prices[k]} - {float(prices[k])/float(v) * 100 - 100}%\n"
+                text += f"{k} - {v} - {prices[k]} - {float(prices[k]) / float(v) * 100 - 100}%\n"
             bot.send_message(message.chat.id, text)
             user.portfolio = json.dumps(prices)
             db.session.add(user)
@@ -122,6 +124,9 @@ def stats(message):
     ticker = message.text.split(maxsplit=1)[1]  # В переменной будет всё,что идёт после /stats
     bot.send_message(message.chat.id, f'Ticker = {ticker}')
     answer = get_stats(ticker)
+    if answer == "Не смог найти":
+        bot.send_message(message.chat.id, f'Не смог найти информацию по данной компании. Проверьте тикер')
+        return
     text = "Сейчас пришлю файл с подробным отчетом о компании"
 
     filename = f'{ticker}_{message.chat.id}_{datetime.now().strftime("%Y-%m-%d_%H_%M")}.pdf'
@@ -155,13 +160,13 @@ def delete(message):
     except Exception as ex:
         print(ex)
 
+
 def main():
     ## if we have a mistake, and want to drop all db
     # with app.app_context():
     #     db.drop_all()
     #     db.create_all()
     app.run(host='0.0.0.0', port=4567, debug=False)
-
 
 
 if __name__ == "__main__":
