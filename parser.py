@@ -15,15 +15,15 @@ BASE_URL = "https://finance.yahoo.com/quote/"
 def get_prices(tickers_array):
     result = dict()
     for ticker in tickers_array:
-        print(ticker)
         response = requests.get(url=BASE_URL + ticker, headers=headers)
-        if response.status_code == 200:
+        if response.status_code != 200 or "No results for" in response.text:
+            result[ticker] = "Не смог найти"
+        else:
             soup = BeautifulSoup(response.text, "lxml")
             price = soup.find("fin-streamer", attrs={"data-symbol": ticker, "data-test": "qsp-price",
                                                      "data-field": "regularMarketPrice"}).get_text()
             result[ticker] = price
-        else:
-            result[ticker] = "Не смог найти"
+
     return result
 
 

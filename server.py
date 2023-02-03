@@ -69,20 +69,23 @@ def add(message):
     try:
         with app.app_context():
             ticker = message.text.split(maxsplit=1)[1]  # В переменной будет всё,что идёт после /stats
+            prices = get_prices([ticker])
+            if prices[ticker] == "Не смог найти":
+                bot.send_message(message.chat.id, f'Не смог найти информацию по данной бумаге. Проверьте Тикер')
+                return
             bot.send_message(message.chat.id, f'Ticker = {ticker}')
             user = User.query.filter_by(chat_id=message.chat.id).first()
             if user is None:
-                data = dict()
-                data = get_prices([ticker])
+
                 user = User(
                     chat_id=message.chat.id,
-                    portfolio=json.dumps(data),
+                    portfolio=json.dumps(prices),
                     firstname=message.from_user.first_name,
                     lastname=message.from_user.last_name
                 )
             else:
                 data = json.loads(user.portfolio)
-                data[ticker] = get_prices([ticker])[ticker]
+                data[ticker] = prices[ticker]
                 user.portfolio = json.dumps(data)
             db.session.add(user)
             db.session.commit()
