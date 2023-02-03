@@ -59,6 +59,7 @@ def start(message):
     text = """Привет,\nЯ бот помошник на рынке акций. Я умею находить цену акций, а также читать новости о компании.
 Чтобы добавить бумагу в портфель напиши /add <тикер на бирже>
 Чтобы получить цену бумаг в портфеле - напиши /prices (После вызова этого метода - последние цены в системе - обновятся)
+Чтобы удалить бумагу из портфеля - напиши /delete <ticker>
 Чтобы получить полную информацию - напиши /stats <ticker>"""
     bot.send_message(message.chat.id, text)
 
@@ -83,7 +84,6 @@ def add(message):
                 data = json.loads(user.portfolio)
                 data[ticker] = get_prices([ticker])[ticker]
                 user.portfolio = json.dumps(data)
-            print(user)
             db.session.add(user)
             db.session.commit()
             bot.send_message(message.chat.id, f'Ticker = {ticker} - added to your portfolio')
@@ -130,6 +130,27 @@ def stats(message):
     time.sleep(3)
     os.remove(filename)
 
+
+@bot.message_handler(commands=['delete'])
+def delete(message):
+    ticker = message.text.split(maxsplit=1)[1]  # В переменной будет всё,что идёт после /stats
+    try:
+        with app.app_context():
+            user = User.query.filter_by(chat_id=message.chat.id).first()
+            if user is None:
+                bot.send_message(message.chat.id, "У вас нет этой бумаги в портфеле")
+                return
+            data = json.loads(user.portfolio)
+            if ticker not in data.keys():
+                bot.send_message(message.chat.id, "У вас нет этой бумаги в портфеле")
+                return
+            del data[ticker]
+            user.portfolio = json.dumps(data)
+            db.session.add(user)
+            db.session.commit()
+            bot.send_message(message.chat.id, "Бумага успешно удалена")
+    except Exception as ex:
+        print(ex)
 
 def main():
     ## if we have a mistake, and want to drop all db
